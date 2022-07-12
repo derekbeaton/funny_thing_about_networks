@@ -1,0 +1,17 @@
+---
+title: "A funny thing happened on the way to the Marvel Cinematic Universe"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<!--
+
+overview: 
+- quick data description
+- show the data via CA and what happens
+- references: 2 lebart and https://www.nature.com/articles/s41598-021-87971-9
+
+-->
