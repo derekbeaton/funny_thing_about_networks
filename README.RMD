@@ -5,13 +5,164 @@ output: github_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(ExPosition)
+library(pheatmap)
+library(here)
+
+load(here::here("data","movie.mats.nogs_min2.rda"))
 ```
 
 <!--
 
 overview: 
-- quick data description
+- quick data description, and what it's not
 - show the data via CA and what happens
 - references: 2 lebart and https://www.nature.com/articles/s41598-021-87971-9
 
 -->
+
+# Overview
+
+First and foremost the title of this is a nod to a [Marvel One Shot](https://www.imdb.com/title/tt2011109/). More importantly, this post comes from a [question on Twitter about eigenvalues](https://twitter.com/ben_golub/status/1546584133266202627) where [I was mistaken and misremembered the property](https://twitter.com/derek__beaton/status/1546612890215530506)! 
+
+
+Incorrectly, I said: correspondence analysis does not indicate cliques when eigenvalues are exactly 1.
+
+I forgot that it's actually: Correspondence analysis does indicate *clusters* or disconnected sub-networks when eigenvalues are exactly 1.
+
+This will be a short whirlwind tour through networks and *one* of the cool properties of correspondence analysis that we see with a particular type of network (or graph) structure.
+
+
+# A bit of background and the data
+
+We're stealing a network matrix from [here](https://github.com/derekbeaton/Marvel-Cinematic-Universe_Network/), which is a particular network of actors in the Marvel Cinematic Universe. The example we'll work with here is a reduced version of the full network under two conditions:
+
+* Remove all Marvel movies (the thing that's most common to all the actors already)
+
+* Keep only the actors who have worked with other actors *at least twice* (i.e., we're thresholding)
+
+* All cells in the square-symmetric matrix are 0 (not connected or haven't acted together at least twice) or 1 (they've worked together at least twice).
+
+* The diagonal cells are special in that these are the relationship between an actor and themselves, so it is a 1 because they are connected to (acted with) themselves
+
+
+```{r echo = F}
+
+pheatmap::pheatmap(movie.mats.nogs_min2$thresh,
+                   cluster_rows = F, cluster_cols = F,
+                   labels_row = "", labels_col = "",
+                   legend = F, color = colorRampPalette(c("white","black"))(2)
+                   )
+
+```
+
+The actor-actor network visualized above shows all the connections between the `r nrow(movie.mats.nogs_min2$thresh)` actors. That is, if they've acted with each other at least twice in non-Marvel movies. It's not obvious that there are three separate networks (connected within themselves, but disconnected from one another).
+
+Correspondence analysis loves [counts](https://twitter.com/CountVonCount). Correspondence analysis is---in its simplest description---a variation of principal components analysis (PCA) but is usually applied to (1) categorical data that's been coded in zeros and ones (a.k.a. one-hot, disjunctive, dummy, or like a million other names) or (2 count data which are non-negative whole numbers. These are *not* the only cases but the usual ones because correspondence analysis is effectively a PCA but applied to data that's been preprocessed under assumptions of $\chi^2$. 
+
+There are many ways to analyze network data with correspondence analysis (and lots of other eigen-y and SVD-based techniques). Too many in fact. So below I show exactly the one example I was thinking of, including how we get there and what it means. At the very end I provide references for those particularly interested in all some of the eigen-shenanigans you can get into if you so choose.
+
+
+# Preparing network data for Correspondence Analysis
+
+The above network picture has a 1 if an actor has acted with another actor at least twice in a non-MCU movie (off-diagonal 1s), a 0 if they haven't (off-diagonal 0s), and a 1 for the actor and themselves (diagonal).
+
+If we change the diagonal to be the *total number of connections* for an actor, then (only) the diagonal elements become greater than or equal to 1. Here, the number of connections is either the row sums or the column sums *excluding* the diagonal. We can say it's the row sums or column sums because this is a symmetric matrix (same in the upper and lower triangle).
+
+
+So we start with a network matrix with 0s on the diagonal, take the column sums and put them into the diagonal. In this case the column sums (now the diagonal) indicates the number of other actors an actor has acted with.
+
+
+```{r echo = F}
+
+pheatmap::pheatmap(movie.mats.nogs_min2$thresh_load_diag,
+                   cluster_rows = F, cluster_cols = F,
+                   labels_row = "", labels_col = "",
+                   legend = F)
+
+```
+
+The above visualization needs some color because we have high values on the diagonal (up to 29 co-acting credits), and the off-diagonal values are all still 0 (blue) or 1 (slightly less blue).
+
+
+I promise there are 3 separate subnetworks in the above visualizations. But you shouldn't take my word for it. We should find that out.
+
+
+# Correspondence analysis
+
+In the special case that there are *sub*networks---that is sets of actors connected to one another but not connected to other actors---correspondence analysis will tell us this right away. Let's see how.
+
+First let's apply correspondence analysis to the above "loaded diagonal" matrix:
+
+```{r}
+
+ca_res <- epCA(movie.mats.nogs_min2$thresh_load_diag, graphs = F)
+
+```
+
+Then let's take a look at the eigenvalues (just the first few):
+
+```{r}
+
+ca_res$ExPosition.Data$eigs[1:5]
+
+```
+
+The first two eigenvalues are exactly 1. When this happens, that means correspondence analysis is trying to tell us it's found some subnetworks. Let's take a look at the component (a.k.a. factor) scores for these first two components
+
+
+```{r}
+
+prettyPlot(ca_res$ExPosition.Data$fi[,1:2], dev.new = F)
+
+```
+
+It can be a bit hard to see but there are only three distinct possible points in the above graph, which contains `r nrow(movie.mats.nogs_min2$thresh_load_diag)` actors.
+
+Let's take a look at what those points are and even some of the actors in those lists.
+
+```{r}
+
+unique(round(ca_res$ExPosition.Data$fi[,1:2],digits = 6))
+
+```
+
+Let's focus on Xueqi Wang and Sophia McGregor, and let's use the network matrix itself to figure this out. We'll do that by finding all places where there are a 1 for Xueqi Wang, and then again for Sophia McGregor
+
+```{r}
+
+which(movie.mats.nogs_min2$thresh["Xueqi Wang",]==1)
+
+```
+
+
+
+```{r}
+
+which(movie.mats.nogs_min2$thresh["Sophia McGregor",]==1)
+
+```
+
+
+
+Et voila. 
+
+
+# References (with some details)
+
+
+There are actually a lot of cool things one can do and great work on applying correspondence analysis to networks/graphs:
+
+* Lebart (1984). Correspondence analysis of graph structures
+
+* Banet and Lebart (1985). Factorial analysis upon a graph
+
+
+These above two go into some of the interesting properties of correspondence analysis, PCA, and particular structures.
+
+Two more modern takes---which provide a lot of details for application and less theory than the above are:
+
+* Greenacre (2017). Correspondence analysis of networks (Ch 25). In Greenacre *Correspondence analysis in practice* 
+
+* van Dam et al., (2021) [Correspondence analysis, spectral clustering and graph embedding: applications to ecology and economic complexity](https://www.nature.com/articles/s41598-021-87971-9). Scientific Reports
