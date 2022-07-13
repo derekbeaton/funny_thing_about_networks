@@ -19,7 +19,7 @@ eigenvalues](https://twitter.com/ben_golub/status/1546584133266202627)
 where [I was mistaken and misremembered the
 property](https://twitter.com/derek__beaton/status/1546612890215530506)!
 
-Incorrectly, I said: correspondence analysis does not indicate cliques
+Incorrectly, I said: correspondence analysis indicates cliques
 when eigenvalues are exactly 1.
 
 I forgot that it’s actually: Correspondence analysis does indicate
